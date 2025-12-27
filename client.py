@@ -20,7 +20,7 @@ LOG_PATH = os.path.join(os.path.dirname(__file__), "send_log.txt")
 MQTT_BROKER = os.getenv("MQTT_BROKER", "broker.hivemq.com")
 MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
 MQTT_TOPIC = os.getenv("MQTT_TOPIC", "oneplk/command")
-MQTT_CLIENT_ID = os.getenv("MQTT_CLIENT_ID") or f"oneplk-{os.getpid()}"
+MQTT_CLIENT_ID = os.getenv("MQTT_CLIENT_ID") or HOSPCODE or f"oneplk-{os.getpid()}"
 
 
 def log_send(command: str, func_name: str, command_dt: str, send_status: str, send_success_dt: str) -> None:
