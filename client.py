@@ -1,7 +1,7 @@
 import os
+import time
 from datetime import datetime
 
-import requests
 from dotenv import load_dotenv
 from paho.mqtt import client as mqtt
 import send_ipd
@@ -15,6 +15,9 @@ ENDPOINT_IPD = os.getenv("END_POINT_IPD", "http://localhost:8000/ipd")
 ENDPOINT_ICU = os.getenv("END_POINT_ICU", "http://localhost:8000/icu")
 ENDPOINT_OR = os.getenv("END_POINT_OR", "http://localhost:8000/or")
 LOG_PATH = os.path.join(os.path.dirname(__file__), "send_log.txt")
+if not os.path.exists(LOG_PATH):
+    # auto-create log file on client start
+    open(LOG_PATH, "a", encoding="utf-8").close()
 
 # MQTT Settings
 MQTT_BROKER = os.getenv("MQTT_BROKER", "broker.hivemq.com")
