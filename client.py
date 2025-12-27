@@ -14,7 +14,6 @@ HOSPCODE = os.getenv("HOSPCODE", "00000")
 ENDPOINT_IPD = os.getenv("END_POINT_IPD", "http://localhost:8000/ipd")
 ENDPOINT_ICU = os.getenv("END_POINT_ICU", "http://localhost:8000/icu")
 ENDPOINT_OR = os.getenv("END_POINT_OR", "http://localhost:8000/or")
-TIMEOUT = 10
 LOG_PATH = os.path.join(os.path.dirname(__file__), "send_log.txt")
 
 # MQTT Settings
