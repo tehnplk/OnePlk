@@ -1,4 +1,5 @@
 import os
+import sys
 import time
 from datetime import datetime
 
@@ -10,7 +11,7 @@ import send_or
 
 load_dotenv()
 
-HOSPCODE = os.getenv("HOSPCODE", "00000")
+HOSPCODE = os.getenv("HOSPCODE", "00001")
 ENDPOINT_IPD = os.getenv("END_POINT_IPD", "http://localhost:8000/ipd")
 ENDPOINT_ICU = os.getenv("END_POINT_ICU", "http://localhost:8000/icu")
 ENDPOINT_OR = os.getenv("END_POINT_OR", "http://localhost:8000/or")
@@ -23,7 +24,15 @@ if not os.path.exists(LOG_PATH):
 MQTT_BROKER = os.getenv("MQTT_BROKER", "broker.hivemq.com")
 MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
 MQTT_TOPIC = os.getenv("MQTT_TOPIC", "oneplk/command")
-MQTT_CLIENT_ID = os.getenv("MQTT_CLIENT_ID") or HOSPCODE or f"oneplk-{os.getpid()}"
+
+
+def resolve_client_id(argv: list[str]) -> str:
+    if len(argv) > 1 and argv[1]:
+        return argv[1]
+    return os.getenv("MQTT_CLIENT_ID") or HOSPCODE or f"oneplk-{os.getpid()}"
+
+
+MQTT_CLIENT_ID = resolve_client_id(sys.argv)
 
 
 def log_send(command: str, func_name: str, command_dt: str, send_status: str, send_success_dt: str) -> None:
