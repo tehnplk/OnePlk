@@ -20,6 +20,7 @@ class DataPayload(BaseModel):
 
 
 def create_jwt_token(sub: str, expires_minutes: int = 60) -> str:
+    """สร้าง JWT token สำหรับทดสอบ"""
     payload = {
         "sub": sub,
         "exp": datetime.utcnow() + timedelta(minutes=expires_minutes),
@@ -29,6 +30,7 @@ def create_jwt_token(sub: str, expires_minutes: int = 60) -> str:
 
 
 def verify_jwt(credentials: HTTPAuthorizationCredentials = Depends(security)) -> dict:
+    """ตรวจสอบ JWT token"""
     token = credentials.credentials
     try:
         payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
@@ -45,12 +47,14 @@ def verify_jwt(credentials: HTTPAuthorizationCredentials = Depends(security)) ->
 
 @app.get("/token/{username}")
 async def get_token(username: str):
+    """สร้าง token สำหรับทดสอบ"""
     token = create_jwt_token(sub=username)
     return {"access_token": token, "token_type": "bearer"}
 
 
 @app.post("/data")
 async def receive_data(payload: DataPayload, claims: dict = Depends(verify_jwt)):
+    """Endpoint ที่ต้องการ JWT authentication"""
     print(f"[DATA] Received from {claims.get('sub')}: {payload}")
     return JSONResponse({
         "status": "ok",
