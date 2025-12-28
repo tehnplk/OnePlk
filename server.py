@@ -1,61 +1,64 @@
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 
-from fastapi import Depends, FastAPI, HTTPException, Request, status
+from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.responses import JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
+from pydantic import BaseModel
 
-
-app = FastAPI()
+app = FastAPI(title="JWT Auth Server")
 security = HTTPBearer(auto_error=True)
 
-JWT_SECRET = os.getenv("JWT_SECRET", "changeme")
-JWT_ALGORITHM = os.getenv("JWT_ALG", "HS256")
+JWT_SECRET = os.getenv("JWT_SECRET", "mysecretkey")
+JWT_ALGORITHM = "HS256"
 
 
-def verify_jwt(credentials: HTTPAuthorizationCredentials = Depends(security)):
+class DataPayload(BaseModel):
+    hospcode: str
+    message: str = ""
+
+
+def create_jwt_token(sub: str, expires_minutes: int = 60) -> str:
+    payload = {
+        "sub": sub,
+        "exp": datetime.utcnow() + timedelta(minutes=expires_minutes),
+        "iat": datetime.utcnow(),
+    }
+    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+
+def verify_jwt(credentials: HTTPAuthorizationCredentials = Depends(security)) -> dict:
     token = credentials.credentials
     try:
         payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        print(f"[AUTH] JWT valid: sub={payload.get('sub')}")
         return payload
-    except JWTError:
+    except JWTError as exc:
+        print(f"[AUTH] JWT error: {exc}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired token",
+            detail=f"Invalid or expired token: {exc}",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
 
-def log_received(tag: str, data: dict, claims: dict | None = None):
-    hospcode = data.get("hospcode", "-")
-    sub = claims.get("sub", "-") if claims else "-"
-    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    print(f"[{tag}] {ts} hospcode={hospcode} sub={sub} data={data}")
+@app.get("/token/{username}")
+async def get_token(username: str):
+    token = create_jwt_token(sub=username)
+    return {"access_token": token, "token_type": "bearer"}
 
 
-@app.post("/ipd")
-async def receive_ipd(request: Request, claims=Depends(verify_jwt)):
-    data = await request.json()
-    log_received("IPD", data, claims)
-    return JSONResponse({"status": "ok", "received": data})
-
-
-@app.post("/icu")
-async def receive_icu(request: Request, claims=Depends(verify_jwt)):
-    data = await request.json()
-    log_received("ICU", data, claims)
-    return JSONResponse({"status": "ok", "received": data})
-
-
-@app.post("/or")
-async def receive_or(request: Request, claims=Depends(verify_jwt)):
-    data = await request.json()
-    log_received("OR", data, claims)
-    return JSONResponse({"status": "ok", "received": data})
+@app.post("/data")
+async def receive_data(payload: DataPayload, claims: dict = Depends(verify_jwt)):
+    print(f"[DATA] Received from {claims.get('sub')}: {payload}")
+    return JSONResponse({
+        "status": "ok",
+        "user": claims.get("sub"),
+        "received": payload.model_dump()
+    })
 
 
 if __name__ == "__main__":
     import uvicorn
-
     uvicorn.run("server:app", host="0.0.0.0", port=8000, reload=True)
