@@ -11,3 +11,6 @@ wheels/
 
 # Logs
 send_log.txt
+
+# Trash
+.trash/
