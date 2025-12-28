@@ -1,15 +1,20 @@
 import os
-from datetime import datetime
 import time
+from datetime import datetime, timedelta
 
 import requests
 from dotenv import load_dotenv
+from jose import jwt
 
 load_dotenv()
 
 HOSPCODE = os.getenv("HOSPCODE", "00000")
 ENDPOINT_OR = os.getenv("END_POINT_OR", "http://localhost:8000/or")
 TIMEOUT = int(os.getenv("TIMEOUT", "10"))
+
+JWT_SECRET = os.getenv("JWT_SECRET", "changeme")
+JWT_ALG = os.getenv("JWT_ALG", "HS256")
+JWT_EXP_SECONDS = int(os.getenv("JWT_EXP_SECONDS", "300"))
 
 DEFAULT_DEPARTMENT = "OR 1"
 DEFAULT_BED_TOTAL = 5
@@ -39,9 +44,19 @@ def send() -> tuple[str, str, str]:
     send_success_dt = ""
 
     payload = prepare_data()
+    token = jwt.encode(
+        {"sub": HOSPCODE, "iat": datetime.utcnow(), "exp": datetime.utcnow() + timedelta(seconds=JWT_EXP_SECONDS)},
+        JWT_SECRET,
+        algorithm=JWT_ALG,
+    )
     print(f"send_or -> {ENDPOINT_OR}")
     try:
-        resp = requests.post(ENDPOINT_OR, json=payload, timeout=TIMEOUT)
+        resp = requests.post(
+            ENDPOINT_OR,
+            json=payload,
+            timeout=TIMEOUT,
+            headers={"Authorization": f"Bearer {token}"},
+        )
         print(f"send_or status={resp.status_code}")
         if resp.ok:
             send_status = "success"
