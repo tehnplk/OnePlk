@@ -12,9 +12,6 @@ import send_or
 load_dotenv()
 
 HOSPCODE = os.getenv("HOSPCODE", "00001")
-ENDPOINT_IPD = os.getenv("END_POINT_IPD", "http://localhost:8000/ipd")
-ENDPOINT_ICU = os.getenv("END_POINT_ICU", "http://localhost:8000/icu")
-ENDPOINT_OR = os.getenv("END_POINT_OR", "http://localhost:8000/or")
 LOG_PATH = os.path.join(os.path.dirname(__file__), "send_log.txt")
 if not os.path.exists(LOG_PATH):
     # auto-create log file on client start

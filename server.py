@@ -10,8 +10,8 @@ from pydantic import BaseModel
 app = FastAPI(title="JWT Auth Server")
 security = HTTPBearer(auto_error=True)
 
-JWT_SECRET = os.getenv("JWT_SECRET", "mysecretkey")
-JWT_ALGORITHM = "HS256"
+JWT_SECRET = os.getenv("JWT_SECRET", "devsecret")
+JWT_ALGORITHM = os.getenv("JWT_ALG", "HS256")
 
 
 class DataPayload(BaseModel):

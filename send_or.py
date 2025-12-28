@@ -9,10 +9,10 @@ from jose import jwt
 load_dotenv()
 
 HOSPCODE = os.getenv("HOSPCODE", "00000")
-ENDPOINT_OR = os.getenv("END_POINT_OR", "http://localhost:8000/or")
+ENDPOINT_OR = os.getenv("END_POINT_OR", "http://localhost:8000/data")
 TIMEOUT = int(os.getenv("TIMEOUT", "10"))
 
-JWT_SECRET = os.getenv("JWT_SECRET", "changeme")
+JWT_SECRET = os.getenv("JWT_SECRET", "devsecret")
 JWT_ALG = os.getenv("JWT_ALG", "HS256")
 JWT_EXP_SECONDS = int(os.getenv("JWT_EXP_SECONDS", "300"))
 
