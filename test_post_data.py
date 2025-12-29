@@ -1,25 +1,19 @@
 import argparse
-import os
-import time
 from datetime import UTC, datetime, timedelta
 
 import requests
-from dotenv import load_dotenv
 from jose import jwt
 
-load_dotenv()
-
-BASE_URL = os.getenv("BASE_URL", "http://localhost:8000")
-TIMEOUT = int(os.getenv("TIMEOUT", "10"))
-
-# JWT config (ต้องตรงกับ server)
+# Config
+BASE_URL = "http://localhost:8000"
+TIMEOUT = 10
 JWT_SECRET = "devsecret"
 JWT_ALGORITHM = "HS256"
 JWT_EXP_SECONDS = 60
 
 
 def create_token(hospcode: str) -> str:
-    """Create JWT token locally"""
+    """Create JWT token"""
     now = datetime.now(UTC)
     payload = {
         "sub": "tester",
@@ -30,25 +24,14 @@ def create_token(hospcode: str) -> str:
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
 
-def prepare_data(hospcode: str) -> dict:
-    print("[DB] Querying data for OPD ...", end="", flush=True)
-    time.sleep(0.5)
-    print(" ok")
-    return {"message": f"OPD data from {hospcode}"}
-
-
-def send(hospcode: str) -> tuple[str, str, str]:
-    now_utc = datetime.now(UTC)
-    command_dt = now_utc.strftime("%Y-%m-%d %H:%M:%S%z")
-    send_status = "fail"
-    send_success_dt = ""
-
+def send(hospcode: str) -> None:
+    """Send data to server with JWT auth"""
     token = create_token(hospcode)
     print(f"[INFO] Created JWT (hospcode={hospcode})")
 
-    payload = prepare_data(hospcode)
+    payload = {"message": f"OPD data from {hospcode}"}
 
-    print(f"send_opd -> {BASE_URL}/data")
+    print(f"[SEND] POST {BASE_URL}/data")
     try:
         resp = requests.post(
             f"{BASE_URL}/data",
@@ -56,20 +39,18 @@ def send(hospcode: str) -> tuple[str, str, str]:
             timeout=TIMEOUT,
             headers={"Authorization": f"Bearer {token}"},
         )
-        print(f"send_opd status={resp.status_code}")
+        print(f"[RESP] status={resp.status_code}")
         if resp.ok:
-            send_status = "success"
-            send_success_dt = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S%z")
+            print(f"[OK] {resp.json()}")
         else:
-            print(f"send_opd error: {resp.json()}")
+            print(f"[ERROR] {resp.json()}")
     except Exception as exc:
-        print(f"send_opd failed: {exc}")
-    return command_dt, send_status, send_success_dt
+        print(f"[FAIL] {exc}")
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Test JWT authentication with server")
-    parser.add_argument("hospcode", help="Hospital code (e.g., 11251, 11252)")
+    parser = argparse.ArgumentParser(description="Test JWT auth with server")
+    parser.add_argument("hospcode", help="Hospital code (e.g., 11251)")
     args = parser.parse_args()
     send(args.hospcode)
 
