@@ -1,8 +1,4 @@
-import os
-from datetime import datetime, timedelta
-
 from fastapi import Depends, FastAPI, HTTPException, status
-from fastapi.responses import JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 from pydantic import BaseModel
@@ -10,23 +6,17 @@ from pydantic import BaseModel
 app = FastAPI(title="JWT Auth Server")
 security = HTTPBearer(auto_error=True)
 
-JWT_SECRET = os.getenv("JWT_SECRET", "devsecret")
-JWT_ALGORITHM = os.getenv("JWT_ALG", "HS256")
+# Hardcoded config
+JWT_SECRET = "devsecret"
+JWT_ALGORITHM = "HS256"
 
 
 class DataPayload(BaseModel):
-    hospcode: str
     message: str = ""
 
 
-def create_jwt_token(sub: str, expires_minutes: int = 60) -> str:
-    """สร้าง JWT token สำหรับทดสอบ"""
-    payload = {
-        "sub": sub,
-        "exp": datetime.utcnow() + timedelta(minutes=expires_minutes),
-        "iat": datetime.utcnow(),
-    }
-    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+ALLOWED_HOSPCODE = {"11251", "11252", "10679"}
+
 
 
 def verify_jwt(credentials: HTTPAuthorizationCredentials = Depends(security)) -> dict:
@@ -34,6 +24,13 @@ def verify_jwt(credentials: HTTPAuthorizationCredentials = Depends(security)) ->
     token = credentials.credentials
     try:
         payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        hospcode_claim = payload.get("hospcode")
+        if not hospcode_claim or hospcode_claim not in ALLOWED_HOSPCODE:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid hospcode in token",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
         print(f"[AUTH] JWT valid: sub={payload.get('sub')}")
         return payload
     except JWTError as exc:
@@ -45,22 +42,16 @@ def verify_jwt(credentials: HTTPAuthorizationCredentials = Depends(security)) ->
         )
 
 
-@app.get("/token/{username}")
-async def get_token(username: str):
-    """สร้าง token สำหรับทดสอบ"""
-    token = create_jwt_token(sub=username)
-    return {"access_token": token, "token_type": "bearer"}
-
-
 @app.post("/data")
 async def receive_data(payload: DataPayload, claims: dict = Depends(verify_jwt)):
     """Endpoint ที่ต้องการ JWT authentication"""
     print(f"[DATA] Received from {claims.get('sub')}: {payload}")
-    return JSONResponse({
+    return {
         "status": "ok",
         "user": claims.get("sub"),
-        "received": payload.model_dump()
-    })
+        "hospcode": claims.get("hospcode"),
+        "received": payload.model_dump(),
+    }
 
 
 if __name__ == "__main__":
