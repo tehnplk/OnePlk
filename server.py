@@ -2,6 +2,7 @@ from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 from pydantic import BaseModel
+from typing import Any
 
 app = FastAPI(title="JWT Auth Server")
 security = HTTPBearer(auto_error=True)
@@ -13,7 +14,12 @@ ALLOWED_HOSPCODE = {"11251", "11252", "10679"}
 
 
 class DataPayload(BaseModel):
-    message: str = ""
+    """Payload structure for incoming data from client"""
+    hospcode: str
+    dataset: str  # IPD, ICU, OR, etc.
+    department: str
+    datetime: str
+    data: dict[str, Any]
 
 
 def verify_jwt(credentials: HTTPAuthorizationCredentials = Depends(security)) -> dict:
@@ -40,10 +46,18 @@ def verify_jwt(credentials: HTTPAuthorizationCredentials = Depends(security)) ->
 @app.post("/data")
 async def receive_data(payload: DataPayload, claims: dict = Depends(verify_jwt)):
     """Protected endpoint - requires valid JWT"""
+    # Verify that the hospcode in payload matches the one in JWT
+    if payload.hospcode != claims.get("hospcode"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Hospcode mismatch between token and payload",
+        )
+    
     return {
         "status": "ok",
         "user": claims.get("sub"),
         "hospcode": claims.get("hospcode"),
+        "dataset": payload.dataset,
         "received": payload.model_dump(),
     }
 

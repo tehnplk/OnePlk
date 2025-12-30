@@ -8,14 +8,12 @@ from paho.mqtt import client as mqtt
 import send_ipd
 import send_icu
 import send_or
+from send_log import log_send, ensure_log_file
 
 load_dotenv()
 
 HOSPCODE = os.getenv("HOSPCODE", "00001")
-LOG_PATH = os.path.join(os.path.dirname(__file__), "send_log.txt")
-if not os.path.exists(LOG_PATH):
-    # auto-create log file on client start
-    open(LOG_PATH, "a", encoding="utf-8").close()
+ensure_log_file()  # auto-create log file on client start
 
 # MQTT Settings
 MQTT_BROKER = os.getenv("MQTT_BROKER", "broker.hivemq.com")
@@ -30,15 +28,6 @@ def resolve_client_id(argv: list[str]) -> str:
 
 
 MQTT_CLIENT_ID = resolve_client_id(sys.argv)
-
-
-def log_send(command: str, func_name: str, command_dt: str, send_status: str, send_success_dt: str) -> None:
-    line = f"{command_dt},{command},{send_status}_{func_name},{send_success_dt}\n"
-    try:
-        with open(LOG_PATH, "a", encoding="utf-8") as f:
-            f.write(line)
-    except Exception as exc:
-        print(f"Failed to write log: {exc}")
 
 
 def on_connect(client, userdata, flags, reason_code, properties=None):
@@ -57,6 +46,7 @@ def on_message(client, userdata, msg):
     command_dt = ""
     send_status = "fail"
     send_success_dt = ""
+    error_reason = ""
     func_name = ""
     command = ""
 
@@ -64,20 +54,20 @@ def on_message(client, userdata, msg):
         case "icu":
             command = "icu"
             func_name = "send_icu"
-            command_dt, send_status, send_success_dt = send_icu.send()
+            command_dt, send_status, send_success_dt, error_reason = send_icu.send()
         case "ipd":
             command = "ipd"
             func_name = "send_ipd"
-            command_dt, send_status, send_success_dt = send_ipd.send()
+            command_dt, send_status, send_success_dt, error_reason = send_ipd.send()
         case "or":
             command = "or"
             func_name = "send_or"
-            command_dt, send_status, send_success_dt = send_or.send()
+            command_dt, send_status, send_success_dt, error_reason = send_or.send()
         case _:
             print(f"Unknown command: '{payload}' (ignored)")
             return
 
-    log_send(command, func_name, command_dt, send_status, send_success_dt)
+    log_send(command, func_name, command_dt, send_status, send_success_dt, error_reason)
 
 
 def run_mqtt():

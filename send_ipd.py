@@ -38,14 +38,16 @@ def prepare_data() -> dict:
     }
 
 
-def send() -> tuple[str, str, str]:
+def send() -> tuple[str, str, str, str]:
+    """Returns (command_dt, send_status, send_success_dt, error_reason)"""
     command_dt = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     send_status = "fail"
     send_success_dt = ""
+    error_reason = ""
 
     payload = prepare_data()
     token = jwt.encode(
-        {"sub": HOSPCODE, "iat": datetime.utcnow(), "exp": datetime.utcnow() + timedelta(seconds=JWT_EXP_SECONDS)},
+        {"sub": HOSPCODE, "hospcode": HOSPCODE, "iat": datetime.utcnow(), "exp": datetime.utcnow() + timedelta(seconds=JWT_EXP_SECONDS)},
         JWT_SECRET,
         algorithm=JWT_ALG,
     )
@@ -61,6 +63,16 @@ def send() -> tuple[str, str, str]:
         if resp.ok:
             send_status = "success"
             send_success_dt = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        else:
+            error_reason = f"HTTP_{resp.status_code}"
+    except requests.exceptions.Timeout:
+        error_reason = "timeout"
+        print(f"send_ipd failed: timeout")
+    except requests.exceptions.ConnectionError:
+        error_reason = "connection_error"
+        print(f"send_ipd failed: connection error")
     except Exception as exc:
+        error_reason = str(exc)[:50].replace(",", ";")  # limit length & escape comma
         print(f"send_ipd failed: {exc}")
-    return command_dt, send_status, send_success_dt
+    return command_dt, send_status, send_success_dt, error_reason
+
