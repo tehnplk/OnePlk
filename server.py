@@ -3,14 +3,18 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 from pydantic import BaseModel
 from typing import Any
+import os
 
 app = FastAPI(title="JWT Auth Server")
 security = HTTPBearer(auto_error=True)
 
-# Config
-JWT_SECRET = "devsecret"
-JWT_ALGORITHM = "HS256"
-ALLOWED_HOSPCODE = {"11251", "11252", "10679"}
+# Config - JWT_SECRET should be set in production!
+_default_secret = "devsecret"
+JWT_SECRET = os.getenv("JWT_SECRET", _default_secret)
+if JWT_SECRET == _default_secret:
+    print("⚠️  WARNING: Using default JWT_SECRET. Set JWT_SECRET env var in production!")
+JWT_ALGORITHM = os.getenv("JWT_ALG", "HS256")
+ALLOWED_HOSPCODE = set(os.getenv("ALLOWED_HOSPCODE", "11251,11252,10679").split(","))
 
 
 class DataPayload(BaseModel):

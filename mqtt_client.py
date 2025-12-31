@@ -20,6 +20,10 @@ MQTT_BROKER = os.getenv("MQTT_BROKER", "localhost")
 MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
 MQTT_TOPIC = os.getenv("MQTT_TOPIC", "oneplk/command")
 
+# Rate Limiting (seconds between same command)
+RATE_LIMIT_SECONDS = int(os.getenv("RATE_LIMIT_SECONDS", "5"))
+_last_command_time: dict[str, float] = {}
+
 
 def resolve_client_id(argv: list[str]) -> str:
     if len(argv) > 1 and argv[1]:
@@ -42,6 +46,15 @@ def on_connect(client, userdata, flags, reason_code, properties=None):
 def on_message(client, userdata, msg):
     payload = msg.payload.decode("utf-8").strip().lower()
     print(f"Received message: '{payload}' on topic: '{msg.topic}'")
+
+    # Rate limiting - prevent command flooding
+    now = time.time()
+    if payload in _last_command_time:
+        elapsed = now - _last_command_time[payload]
+        if elapsed < RATE_LIMIT_SECONDS:
+            print(f"Rate limited: '{payload}' (wait {RATE_LIMIT_SECONDS - elapsed:.1f}s)")
+            return
+    _last_command_time[payload] = now
 
     command_dt = ""
     send_status = "fail"
