@@ -19,6 +19,8 @@ ensure_log_file()  # auto-create log file on client start
 MQTT_BROKER = os.getenv("MQTT_BROKER", "localhost")
 MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
 MQTT_TOPIC = os.getenv("MQTT_TOPIC", "oneplk/command")
+MQTT_USERNAME = os.getenv("MQTT_USERNAME")
+MQTT_PASSWORD = os.getenv("MQTT_PASSWORD")
 
 # Rate Limiting (seconds between same command)
 RATE_LIMIT_SECONDS = int(os.getenv("RATE_LIMIT_SECONDS", "5"))
@@ -40,7 +42,7 @@ def on_connect(client, userdata, flags, reason_code, properties=None):
         print(f"Connected to MQTT Broker: {MQTT_BROKER}")
         client.subscribe(MQTT_TOPIC)
     else:
-        print(f"Failed to connect, return code {rc}")
+        print(f"Failed to connect: {reason_code} (Code: {rc})")
 
 
 def on_message(client, userdata, msg):
@@ -86,6 +88,20 @@ def on_message(client, userdata, msg):
 def run_mqtt():
     print(f"Starting MQTT Client... Broker: {MQTT_BROKER}:{MQTT_PORT}, Topic: {MQTT_TOPIC}")
     client = mqtt.Client(callback_api_version=mqtt.CallbackAPIVersion.VERSION2, client_id=MQTT_CLIENT_ID)
+
+    if MQTT_USERNAME and MQTT_PASSWORD:
+        client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD)
+
+    if MQTT_PORT == 8883:
+        import ssl
+        cert_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "emqxsl-ca.crt")
+        if os.path.exists(cert_path):
+            print(f"Using CA certificate: {cert_path}")
+            client.tls_set(ca_certs=cert_path)
+        else:
+            print("Warning: CA certificate not found. Using insecure SSL.")
+            client.tls_set(cert_reqs=ssl.CERT_NONE)
+            client.tls_insecure_set(True)
     client.on_connect = on_connect
     client.on_message = on_message
 

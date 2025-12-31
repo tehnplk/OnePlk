@@ -7,7 +7,9 @@ import os
 import sys
 import time
 from datetime import datetime
+from datetime import datetime
 from typing import Optional
+import ssl
 
 from dotenv import load_dotenv
 from paho.mqtt import client as mqtt
@@ -92,7 +94,21 @@ class SettingsDialog(QDialog):
         # Client ID
         self.client_id_input = QLineEdit()
         self.client_id_input.setPlaceholderText("Leave empty for auto-generated")
+        # Client ID
+        self.client_id_input = QLineEdit()
+        self.client_id_input.setPlaceholderText("Leave empty for auto-generated")
         form_layout.addRow("Client ID:", self.client_id_input)
+
+        # Username
+        self.username_input = QLineEdit()
+        self.username_input.setPlaceholderText("Optional")
+        form_layout.addRow("Username:", self.username_input)
+
+        # Password
+        self.password_input = QLineEdit()
+        self.password_input.setEchoMode(QLineEdit.EchoMode.Password)
+        self.password_input.setPlaceholderText("Optional")
+        form_layout.addRow("Password:", self.password_input)
         
         # Rate limit
         self.rate_limit_input = QSpinBox()
@@ -235,6 +251,17 @@ class SettingsDialog(QDialog):
         self.client_id_input.setText(
             self.settings.value("mqtt/client_id", os.getenv("MQTT_CLIENT_ID", "") or hospcode)
         )
+        # Robust loading for SettingsDialog
+        username = self.settings.value("mqtt/username", "")
+        if not username:
+            username = os.getenv("MQTT_USERNAME", "")
+            
+        password = self.settings.value("mqtt/password", "")
+        if not password:
+            password = os.getenv("MQTT_PASSWORD", "")
+
+        self.username_input.setText(username)
+        self.password_input.setText(password)
         self.rate_limit_input.setValue(
             int(self.settings.value("mqtt/rate_limit", os.getenv("RATE_LIMIT_SECONDS", "5")))
         )
@@ -245,6 +272,8 @@ class SettingsDialog(QDialog):
         self.settings.setValue("mqtt/port", self.port_input.value())
         self.settings.setValue("mqtt/topic", self.topic_input.text())
         self.settings.setValue("mqtt/client_id", self.client_id_input.text())
+        self.settings.setValue("mqtt/username", self.username_input.text())
+        self.settings.setValue("mqtt/password", self.password_input.text())
         self.settings.setValue("mqtt/rate_limit", self.rate_limit_input.value())
         self.settings.sync()
     
@@ -265,6 +294,8 @@ class SettingsDialog(QDialog):
         """ทดสอบการเชื่อมต่อ MQTT broker"""
         broker = self.broker_input.text().strip()
         port = self.port_input.value()
+        username = self.username_input.text().strip()
+        password = self.password_input.text()
         
         if not broker:
             self.test_status_label.setText("❌ Please enter broker address")
@@ -283,6 +314,17 @@ class SettingsDialog(QDialog):
                 callback_api_version=mqtt.CallbackAPIVersion.VERSION2,
                 client_id=f"test-{os.getpid()}"
             )
+            
+            if username and password:
+                test_client.username_pw_set(username, password)
+
+            if port == 8883:
+                cert_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "emqxsl-ca.crt")
+                if os.path.exists(cert_path):
+                    test_client.tls_set(ca_certs=cert_path)
+                else:
+                    test_client.tls_set(cert_reqs=ssl.CERT_NONE)
+                    test_client.tls_insecure_set(True)
             
             connected = False
             error_msg = ""
@@ -338,12 +380,14 @@ class MQTTWorker(QThread):
     message_received = pyqtSignal(str)  # Signal สำหรับส่งข้อความไปยัง GUI
     connection_status = pyqtSignal(bool, str)  # Signal สำหรับสถานะการเชื่อมต่อ
     
-    def __init__(self, broker: str, port: int, topic: str, client_id: str, rate_limit: int = 5):
+    def __init__(self, broker: str, port: int, topic: str, client_id: str, username: str = "", password: str = "", rate_limit: int = 5):
         super().__init__()
         self.broker = broker
         self.port = port
         self.topic = topic
         self.client_id = client_id
+        self.username = username
+        self.password = password
         self.running = True
         self.client: Optional[mqtt.Client] = None
         
@@ -430,6 +474,27 @@ class MQTTWorker(QThread):
             callback_api_version=mqtt.CallbackAPIVersion.VERSION2,
             client_id=self.client_id
         )
+
+        self.client = mqtt.Client(
+            callback_api_version=mqtt.CallbackAPIVersion.VERSION2,
+            client_id=self.client_id
+        )
+
+        if self.username and self.password:
+            self.log(f"🔐 Authenticating as user: {self.username}")
+            self.client.username_pw_set(self.username, self.password)
+        else:
+            self.log("⚠️ No authentication credentials provided")
+        
+        if self.port == 8883:
+            cert_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "emqxsl-ca.crt")
+            if os.path.exists(cert_path):
+                self.log(f"🔐 Using CA certificate: {cert_path}")
+                self.client.tls_set(ca_certs=cert_path)
+            else:
+                self.log("⚠️ CA certificate not found. Using insecure SSL.")
+                self.client.tls_set(cert_reqs=ssl.CERT_NONE)
+                self.client.tls_insecure_set(True)
         self.client.on_connect = self.on_connect
         self.client.on_disconnect = self.on_disconnect
         self.client.on_message = self.on_message
@@ -652,11 +717,21 @@ class MQTTClientGUI(QMainWindow):
         """โหลด settings จาก QSettings"""
         hospcode = os.getenv("HOSPCODE", "00001")
         
+        username = self.settings.value("mqtt/username")
+        if not username:
+             username = os.getenv("MQTT_USERNAME", "")
+        
+        password = self.settings.value("mqtt/password")
+        if not password:
+             password = os.getenv("MQTT_PASSWORD", "")
+
         self.current_settings = {
             "broker": self.settings.value("mqtt/broker", os.getenv("MQTT_BROKER", "localhost")),
             "port": int(self.settings.value("mqtt/port", os.getenv("MQTT_PORT", "1883"))),
             "topic": self.settings.value("mqtt/topic", os.getenv("MQTT_TOPIC", "oneplk/command")),
             "client_id": self.settings.value("mqtt/client_id", os.getenv("MQTT_CLIENT_ID", "") or hospcode),
+            "username": username,
+            "password": password,
             "rate_limit": int(self.settings.value("mqtt/rate_limit", os.getenv("RATE_LIMIT_SECONDS", "5"))),
         }
         
@@ -689,13 +764,22 @@ class MQTTClientGUI(QMainWindow):
         port = self.current_settings.get("port", 1883)
         topic = self.current_settings.get("topic", "oneplk/command")
         client_id = self.current_settings.get("client_id") or f"oneplk-{os.getpid()}"
+        
+        # Robust fallback for connect
+        username = self.current_settings.get("username", "")
+        if not username:
+             username = os.getenv("MQTT_USERNAME", "")
+             
+        password = self.current_settings.get("password", "")
+        if not password:
+             password = os.getenv("MQTT_PASSWORD", "")
         rate_limit = self.current_settings.get("rate_limit", 5)
         
         # Ensure log file exists
         ensure_log_file()
         
         # Create and start worker
-        self.mqtt_worker = MQTTWorker(broker, port, topic, client_id, rate_limit)
+        self.mqtt_worker = MQTTWorker(broker, port, topic, client_id, username, password, rate_limit)
         self.mqtt_worker.message_received.connect(self.append_log)
         self.mqtt_worker.connection_status.connect(self.update_status)
         self.mqtt_worker.start()
@@ -722,6 +806,8 @@ class MQTTClientGUI(QMainWindow):
     def append_log(self, message: str):
         """เพิ่มข้อความลงใน output log"""
         self.output_text.append(message)
+        # Also print to console
+        print(message)
         # Auto-scroll to bottom
         cursor = self.output_text.textCursor()
         cursor.movePosition(QTextCursor.MoveOperation.End)
