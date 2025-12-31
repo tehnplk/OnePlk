@@ -16,7 +16,7 @@ HOSPCODE = os.getenv("HOSPCODE", "00001")
 ensure_log_file()  # auto-create log file on client start
 
 # MQTT Settings
-MQTT_BROKER = os.getenv("MQTT_BROKER", "broker.hivemq.com")
+MQTT_BROKER = os.getenv("MQTT_BROKER", "localhost")
 MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
 MQTT_TOPIC = os.getenv("MQTT_TOPIC", "oneplk/command")
 
