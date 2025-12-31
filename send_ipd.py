@@ -1,6 +1,6 @@
 import os
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import requests
 from dotenv import load_dotenv
@@ -47,7 +47,7 @@ def send() -> tuple[str, str, str, str]:
 
     payload = prepare_data()
     token = jwt.encode(
-        {"sub": HOSPCODE, "hospcode": HOSPCODE, "iat": datetime.utcnow(), "exp": datetime.utcnow() + timedelta(seconds=JWT_EXP_SECONDS)},
+        {"sub": HOSPCODE, "hospcode": HOSPCODE, "iat": datetime.now(timezone.utc), "exp": datetime.now(timezone.utc) + timedelta(seconds=JWT_EXP_SECONDS)},
         JWT_SECRET,
         algorithm=JWT_ALG,
     )
@@ -76,3 +76,7 @@ def send() -> tuple[str, str, str, str]:
         print(f"send_ipd failed: {exc}")
     return command_dt, send_status, send_success_dt, error_reason
 
+
+if __name__ == "__main__":
+    result = send()
+    print(f"Result: {result}")
