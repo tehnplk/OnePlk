@@ -38,3 +38,7 @@
 2025-12-31 16:01:13,icu,success_send_icu,2025-12-31 16:01:16
 2025-12-31 16:01:16,ipd,success_send_ipd,2025-12-31 16:01:19
 2025-12-31 16:01:19,or,success_send_or,2025-12-31 16:01:21
+2026-01-01 11:08:26,icu,fail_send_icu,,connection_error
+2026-01-01 11:09:48,icu,success_send_icu,2026-01-01 11:09:50
+2026-01-01 11:09:56,ipd,success_send_ipd,2026-01-01 11:09:59
+2026-01-01 11:10:40,or,success_send_or,2026-01-01 11:10:42
